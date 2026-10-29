@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADT Tabuleiros - PCP, Remessas com Histórico & 4 Lasers</title>
+  <style>
+    :root {
+      --primary: #e65100;
+      --primary-dark: #bf360c;
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-card: #252525;
+      --text: #ffffff;
+      --text-muted: #aaa;
+      --border: #333;
+      --success: #4caf50;
+      --warning: #ff9800;
+      --danger: #f44336;
+      --info: #2196f3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 40px; }
+    header { background: #000; border-bottom: 2px solid var(--primary); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .logo-badge { background: var(--primary); color: #fff; font-weight: bold; padding: 6px 12px; border-radius: 6px; }
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; }
+    nav button { background: none; border: none; color: var(--text-muted); padding: 14px 20px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(230,81,0,0.1); }
+    main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+    @media(max-width: 900px) { .grid-2, .grid-4 { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-bottom: 20px; }
+    .card h3 { font-size: 15px; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+    form label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    form input, form select { width: 100%; padding: 8px 10px; background: #2a2a2a; border: 1px solid var(--border); border-radius: 5px; color: #fff; margin-bottom: 10px; font-size: 12px; }
+    .btn { background: var(--primary); color: #fff; border: none; padding: 8px 14px; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 12px; }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+    .btn-success { background: var(--success); }
+    .btn-warning { background: var(--warning); color: #000; }
+    .btn-info { background: var(--info); }
+    .btn-secondary { background: #333; color: #fff; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #252525; color: var(--text-muted); }
+    .badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; }
+    .badge-ok { background: rgba(76, 175, 80, 0.2); color: var(--success); border: 1px solid var(--success); }
+    .badge-corte { background: rgba(33, 150, 243, 0.2); color: var(--info); border: 1px solid var(--info); }
+    .badge-pausa { background: rgba(255, 152, 0, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-pendente { background: rgba(255, 255, 255, 0.1); color: #aaa; border: 1px solid #555; }
+    .badge-archived { background: rgba(156, 39, 176, 0.2); color: #e040fb; border: 1px solid #e040fb; }
+    .laser-card { background: var(--surface-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+    .operador-item { background: #2a2a2a; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
+    .progress-bar { background: #333; height: 16px; border-radius: 8px; overflow: hidden; position: relative; margin-top: 5px; }
+    .progress-fill { height: 100%; background: var(--primary); transition: width 0.3s; }
+    .progress-text { position: absolute; width: 100%; text-align: center; font-size: 10px; line-height: 16px; font-weight: bold; color: #fff; top: 0; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="logo-badge">ADT</div>
+      <div>
+        <h1 style="font-size:16px;">ADT Tabuleiros</h1>
+        <p style="font-size:11px; color:#aaa;">PCP de Remessas com Arquivamento Diário & 4 Lasers</p>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" onclick="mudarAba('banco-chapas', event)">1. Banco de Chapas / Nesting</button>
+    <button onclick="mudarAba('remessas', event)">2. Criar Remessa do Dia</button>
+    <button onclick="mudarAba('acompanhamento-remessas', event)">3. Painel do Programador (Ativas)</button>
+    <button onclick="mudarAba('painel-operadores', event)">4. Painel dos 4 Lasers (Operadores)</button>
+    <button onclick="mudarAba('historico-remessas', event)">5. 📁 Histórico de Remessas</button>
+  </nav>
+
+  <main>
+    <!-- ABA 1: BANCO DE CHAPAS -->
+    <div id="banco-chapas" class="tab-content active">
+      <div class="grid-2">
+        <div class="card">
+          <h3>Cadastrar Chapa no Banco de Dados</h3>
+          <form onsubmit="cadastrarChapa(event)">
+            <label>Código da Chapa (Ex: Ch30_MIX):</label>
+            <input type="text" id="chapa-codigo" placeholder="Ex: Ch30_MIX" required>
+
+            <div class="grid-2">
+              <div>
+                <label>Tempo de Corte (minutos):</label>
+                <input type="number" id="chapa-tempo" placeholder="Ex: 12" required>
+              </div>
+              <div>
+                <label>Espessura MDF:</label>
+                <select id="chapa-mdf">
+                  <option value="3mm">3mm</option>
+                  <option value="6mm">6mm</option>
+                </select>
+              </div>
+            </div>
+
+            <h4 style="font-size:12px; color:var(--primary); margin:10px 0;">Composição da Chapa (Peças por Placa):</h4>
+            <div id="itens-chapa-container"></div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="addComposicaoItem()" style="margin-bottom:10px;">+ Adicionar Produto na Chapa</button>
+            <br>
+            <button type="submit" class="btn btn-success">Salvar no Banco de Dados</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Biblioteca de Chapas Cadastradas</h3>
+          <div id="lista-banco-chapas"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA 2: CRIAR REMESSA DO DIA -->
+    <div id="remessas" class="tab-content">
+      <div class="grid-2">
+        <div class="card">
+          <h3>Lançar Demanda da Remessa</h3>
+          <form onsubmit="adicionarItemRemessa(event)">
+            <div class="grid-2">
+              <div>
+                <label>Nome / Código da Remessa:</label>
+                <input type="text" id="remessa-nome" value="Remessa 2810" required>
+              </div>
+              <div>
+                <label>Data de Programação:</label>
+                <input type="date" id="remessa-data" required>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div>
+                <label>Produto / Diâmetro:</label>
+                <select id="remessa-produto">
+                  <option value="300mm">300mm (Redondo 30cm)</option>
+                  <option value="250mm">250mm (Redondo 25cm)</option>
+                  <option value="200mm">200mm (Redondo 20cm)</option>
+                  <option value="125mm">125mm (Redondo 12.5cm)</option>
+                </select>
+              </div>
+              <div>
+                <label>Quantidade Pedida:</label>
+                <input type="number" id="remessa-qtd" placeholder="Ex: 500" required>
+              </div>
+            </div>
+            <button type="submit" class="btn">Adicionar Item à Remessa</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Itens Lançados para Programação</h3>
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Remessa</th><th>Produto</th><th>Demanda Pedida</th><th>Ação</th></tr>
+            </thead>
+            <tbody id="tb-remessa-itens"></tbody>
+          </table>
+          <button class="btn btn-warning" style="margin-top:15px; width:100%;" onclick="programarEDistribuirRemessas()">⚡ Programar e Enviar aos 4 Lasers ➔</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA 3: PAINEL DO PROGRAMADOR (REMESSAS ATIVAS) -->
+    <div id="acompanhamento-remessas" class="tab-content">
+      <div class="card">
+        <h3>
+          <span>Painel do Programador — Remessas em Andamento</span>
+          <button class="btn btn-sm btn-secondary" onclick="arquivarRemessasConcluidas()">🧹 Arquivar Concluídas</button>
+        </h3>
+        <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Monitoramento em tempo real do chão de fábrica:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Identificação</th>
+              <th>Progresso de Corte</th>
+              <th>Chapas Prontas</th>
+              <th>Status Geral</th>
+              <th>Ações PCP</th>
+            </tr>
+          </thead>
+          <tbody id="tb-status-remessas"></tbody>
+        </table>
+      </div>
+
+      <div id="detalhes-remessas-container"></div>
+    </div>
+
+    <!-- ABA 4: PAINEL DOS 4 LASERS (OPERADORES) -->
+    <div id="painel-operadores" class="tab-content">
+      <div class="card">
+        <h3>Painel dos 4 Lasers — Operação em Chão de Fábrica</h3>
+        <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Exibe APENAS lotes ativos. Ao clicar em 'Finalizar Lote', ele sai da máquina e atualiza no PCP.</p>
+      </div>
+
+      <div class="grid-4" id="grid-painel-4-lasers"></div>
+    </div>
+
+    <!-- ABA 5: HISTÓRICO DE REMESSAS -->
+    <div id="historico-remessas" class="tab-content">
+      <div class="card">
+        <h3>📁 Histórico Geral de Remessas Finalizadas</h3>
+        <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Consultas passadas para conferência de volume e acerto de comissões:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Remessa</th>
+              <th>Total de Peças</th>
+              <th>Status do Ciclo</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tb-historico-remessas"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let bancoChapas = [
+      {
+        id: 'b1',
+        codigo: 'Ch30_MIX',
+        tempoMin: 12,
+        mdf: '3mm',
+        itens: [
+          { produto: '300mm', qtd: 38 },
+          { produto: '200mm', qtd: 6 },
+          { produto: '125mm', qtd: 5 }
+        ]
+      },
+      {
+        id: 'b2',
+        codigo: 'Ch25_PURO',
+        tempoMin: 10,
+        mdf: '3mm',
+        itens: [
+          { produto: '250mm', qtd: 70 }
+        ]
+      }
+    ];
+
+    let remessasGerais = [
+      {
+        id: 'rem_2810',
+        nome: 'Remessa 2810',
+        data: '2026-10-28',
+        statusCiclo: 'Ativa',
+        itens: [
+          { produto: '300mm', qtd: 500 },
+          { produto: '200mm', qtd: 80 }
+        ]
+      },
+      {
+        id: 'rem_2809',
+        nome: 'Remessa 2809',
+        data: '2026-10-27',
+        statusCiclo: 'Arquivada',
+        itens: [
+          { produto: '250mm', qtd: 700 }
+        ]
+      }
+    ];
+
+    let lotesLasers = [];
+
+    function init() {
+      const hoje = new Date().toISOString().split('T')[0];
+      document.getElementById('remessa-data').value = hoje;
+
+      renderizarBancoChapas();
+      renderizarRemessaItensForm();
+      programarEDistribuirRemessas();
+      renderizarHistorico();
+    }
+
+    function mudarAba(id, ev) {
+      document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(e => e.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if (ev && ev.target) {
+        ev.target.classList.add('active');
+      }
+    }
+
+    let contadorComposicao = 0;
+    function addComposicaoItem(p = '300mm', q = '') {
+      const container = document.getElementById('itens-chapa-container');
+      const div = document.createElement('div');
+      div.className = 'grid-2';
+      div.id = 'comp-' + contadorComposicao;
+      div.innerHTML = `
+        <select class="comp-p">
+          <option value="300mm" ${p==='300mm'?'selected':''}>300mm</option>
+          <option value="250mm" ${p==='250mm'?'selected':''}>250mm</option>
+          <option value="200mm" ${p==='200mm'?'selected':''}>200mm</option>
+          <option value="125mm" ${p==='125mm'?'selected':''}>125mm</option>
+        </select>
+        <input type="number" class="comp-q" placeholder="Qtd pçs por chapa" value="${q}" required>
+      `;
+      container.appendChild(div);
+      contadorComposicao++;
+    }
+
+    function cadastrarChapa(e) {
+      e.preventDefault();
+      const codigo = document.getElementById('chapa-codigo').value;
+      const tempoMin = Number(document.getElementById('chapa-tempo').value);
+      const mdf = document.getElementById('chapa-mdf').value;
+
+      const ps = document.querySelectorAll('.comp-p');
+      const qs = document.querySelectorAll('.comp-q');
+      let itens = [];
+
+      ps.forEach((el, idx) => {
+        if (el.value && qs[idx].value) {
+          itens.push({ produto: el.value, qtd: Number(qs[idx].value) });
+        }
+      });
+
+      bancoChapas.push({ id: 'b' + Date.now(), codigo, tempoMin, mdf, itens });
+      renderizarBancoChapas();
+      e.target.reset();
+      document.getElementById('itens-chapa-container').innerHTML = '';
+    }
+
+    function renderizarBancoChapas() {
+      const el = document.getElementById('lista-banco-chapas');
+      el.innerHTML = bancoChapas.map(c => `
+        <div style="background:#2a2a2a; padding:10px; border-radius:5px; margin-bottom:10px;">
+          <strong>Chapa: ${c.codigo}</strong> (${c.mdf} - ${c.tempoMin} min/corte)
+          <ul style="font-size:11px; margin-left:15px; margin-top:5px;">
+            ${c.itens.map(i => `<li>${i.qtd}un de ${i.produto}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+    }
+
+    function renderizarRemessaItensForm() {
+      const tb = document.getElementById('tb-remessa-itens');
+      tb.innerHTML = '';
+
+      const remessasAtivas = remessasGerais.filter(r => r.statusCiclo === 'Ativa');
+      remessasAtivas.forEach(rem => {
+        rem.itens.forEach(item => {
+          tb.innerHTML += `
+            <tr>
+              <td>${rem.data}</td>
+              <td><strong>${rem.nome}</strong></td>
+              <td>${item.produto}</td>
+              <td>${item.qtd} pçs</td>
+              <td><button class="btn btn-sm btn-secondary" onclick="removerItemRemessa('${rem.id}', '${item.produto}')">Excluir</button></td>
+            </tr>
+          `;
+        });
+      });
+    }
+
+    function adicionarItemRemessa(e) {
+      e.preventDefault();
+      const nome = document.getElementById('remessa-nome').value;
+      const data = document.getElementById('remessa-data').value;
+      const prod = document.getElementById('remessa-produto').value;
+      const qtd = Number(document.getElementById('remessa-qtd').value);
+
+      let remessaExistente = remessasGerais.find(r => r.nome === nome && r.statusCiclo === 'Ativa');
+
+      if (remessaExistente) {
+        remessaExistente.itens.push({ produto: prod, qtd: qtd });
+      } else {
+        remessasGerais.push({
+          id: 'rem_' + Date.now(),
+          nome: nome,
+          data: data,
+          statusCiclo: 'Ativa',
+          itens: [{ produto: prod, qtd: qtd }]
+        });
+      }
+
+      renderizarRemessaItensForm();
+    }
+
+    function removerItemRemessa(remId, prod) {
+      const rem = remessasGerais.find(r => r.id === remId);
+      if (rem) {
+        rem.itens = rem.itens.filter(i => i.produto !== prod);
+        if (rem.itens.length === 0) {
+          remessasGerais = remessasGerais.filter(r => r.id !== remId);
+        }
+        renderizarRemessaItensForm();
+      }
+    }
+
+    function programarEDistribuirRemessas() {
+      lotesLasers = [];
+      const lasers = ['Laser 1', 'Laser 2', 'Laser 3', 'Laser 4'];
+      const remessasAtivas = remessasGerais.filter(r => r.statusCiclo === 'Ativa');
+
+      remessasAtivas.forEach(rem => {
+        bancoChapas.forEach(chapa => {
+          let maxChapas = 0;
+          chapa.itens.forEach(iChapa => {
+            const itemPed = rem.itens.find(ir => ir.produto === iChapa.produto);
+            if (itemPed) {
+              let nec = Math.ceil(itemPed.qtd / iChapa.qtd);
+              if (nec > maxChapas) maxChapas = nec;
+            }
+          });
+
+          if (maxChapas > 0) {
+            let base = Math.floor(maxChapas / 4);
+            let sobra = maxChapas % 4;
+
+            lasers.forEach((laserNome, idx) => {
+              let chapasDoLaser = base + (idx < sobra ? 1 : 0);
+              if (chapasDoLaser > 0) {
+                lotesLasers.push({
+                  id: 'l_' + rem.id + '_' + Math.random(),
+                  laser: laserNome,
+                  remessaId: rem.id,
+                  remessaNome: rem.nome,
+                  chapaCodigo: chapa.codigo,
+                  chapasTotais: chapasDoLaser,
+                  chapasConcluidas: 0,
+                  tempoMinUnit: chapa.tempoMin,
+                  status: 'Pendente'
+                });
+              }
+            });
+          }
+        });
+      });
+
+      renderizarStatusProgramador();
+      renderizarPainelLasers();
+    }
+
+    function renderizarStatusProgramador() {
+      const remessasAtivas = remessasGerais.filter(r => r.statusCiclo === 'Ativa');
+      const tbStatus = document.getElementById('tb-status-remessas');
+      tbStatus.innerHTML = '';
+
+      const containerDetalhes = document.getElementById('detalhes-remessas-container');
+      containerDetalhes.innerHTML = '';
+
+      if (remessasAtivas.length === 0) {
+        tbStatus.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">Nenhuma remessa ativa no momento.</td></tr>';
+        return;
+      }
+
+      remessasAtivas.forEach(rem => {
+        const lotesDaRem = lotesLasers.filter(l => l.remessaId === rem.id);
+        
+        let chapasTotais = lotesDaRem.reduce((acc, c) => acc + c.chapasTotais, 0);
+        let chapasConcluidas = lotesDaRem.reduce((acc, c) => acc + c.chapasConcluidas, 0);
+        let pct = chapasTotais > 0 ? Math.round((chapasConcluidas / chapasTotais) * 100) : 0;
+
+        let statusGeral = 'Pendente';
+        if (pct === 100) statusGeral = 'Concluída';
+        else if (lotesDaRem.some(l => l.status === 'Em Corte')) statusGeral = 'Em Corte';
+        else if (lotesDaRem.some(l => l.status === 'Em Pausa / Setup')) statusGeral = 'Em Pausa';
+
+        tbStatus.innerHTML += `
+          <tr>
+            <td>${rem.data}</td>
+            <td><strong>${rem.nome}</strong></td>
+            <td>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${pct}%;"></div>
+                <div class="progress-text">${pct}%</div>
+              </div>
+            </td>
+            <td>${chapasConcluidas} / ${chapasTotais} chapas</td>
+            <td><span class="badge ${statusGeral==='Concluída'?'badge-ok':statusGeral==='Em Corte'?'badge-corte':statusGeral==='Em Pausa'?'badge-pausa':'badge-pendente'}">${statusGeral}</span></td>
+            <td>
+              ${pct === 100 ? `<button class="btn btn-sm btn-success" onclick="arquivarRemessaDireto('${rem.id}')">📁 Arquivar</button>` : '<span style="font-size:11px; color:#aaa;">Rodando...</span>'}
+            </td>
+          </tr>
+        `;
+
+        let prodRealPorProduto = {};
+        lotesDaRem.forEach(lote => {
+          const chapa = bancoChapas.find(b => b.codigo === lote.chapaCodigo);
+          if (chapa) {
+            chapa.itens.forEach(i => {
+              prodRealPorProduto[i.produto] = (prodRealPorProduto[i.produto] || 0) + (i.qtd * lote.chapasConcluidas);
+            });
+          }
+        });
+
+        let linhasTabela = rem.itens.map(r => {
+          let cortadas = prodRealPorProduto[r.produto] || 0;
+          let saldo = r.qtd - cortadas;
+          let ok = cortadas >= r.qtd;
+
+          return `
+            <tr>
+              <td><strong>${r.produto}</strong></td>
+              <td>${r.qtd} un</td>
+              <td>${cortadas} un</td>
+              <td style="color:${saldo<=0?'#4caf50':'#ff9800'}">${saldo<=0?'0 (Concluído)':saldo+' un'}</td>
+              <td><span class="badge ${ok?'badge-ok':'badge-pendente'}">${ok?'100% PRONTO':cortadas>0?'EM CORTE':'AGUARDANDO'}</span></td>
+            </tr>
+          `;
+        }).join('');
+
+        containerDetalhes.innerHTML += `
+          <div class="card">
+            <h3>Balanço da ${rem.nome} (${rem.data})</h3>
+            <table>
+              <thead>
+                <tr><th>Produto</th><th>Demanda Pedida</th><th>Peças Prontas</th><th>Saldo Faltante</th><th>Status</th></tr>
+              </thead>
+              <tbody>${linhasTabela}</tbody>
+            </table>
+          </div>
+        `;
+      });
+    }
+
+    function arquivarRemessaDireto(id) {
+      const rem = remessasGerais.find(r => r.id === id);
+      if (rem) {
+        rem.statusCiclo = 'Arquivada';
+        renderizarStatusProgramador();
+        renderizarPainelLasers();
+        renderizarHistorico();
+      }
+    }
+
+    function arquivarRemessasConcluidas() {
+      remessasGerais.forEach(rem => {
+        const lotesDaRem = lotesLasers.filter(l => l.remessaId === rem.id);
+        let chapasTotais = lotesDaRem.reduce((acc, c) => acc + c.chapasTotais, 0);
+        let chapasConcluidas = lotesDaRem.reduce((acc, c) => acc + c.chapasConcluidas, 0);
+
+        if (chapasTotais > 0 && chapasTotais === chapasConcluidas) {
+          rem.statusCiclo = 'Arquivada';
+        }
+      });
+
+      renderizarStatusProgramador();
+      renderizarPainelLasers();
+      renderizarHistorico();
+    }
+
+    function renderizarPainelLasers() {
+      const container = document.getElementById('grid-painel-4-lasers');
+      container.innerHTML = '';
+
+      const lasers = ['Laser 1', 'Laser 2', 'Laser 3', 'Laser 4'];
+
+      lasers.forEach(laserNome => {
+        // Correção no filtro dos lotes por máquina
+        const lotesPendentes = lotesLasers.filter(l => {
+          const parentRem = remessasGerais.find(r => r.id === l.remessaId);
+          return parentRem && parentRem.statusCiclo === 'Ativa' && l.status !== 'Concluído' && l.laser === laserNome;
+        });
+
+        let htmlLotes = lotesPendentes.map(lote => `
+          <div class="operador-item">
+            <div style="display:flex; justify-content:space-between;">
+              <strong>${lote.chapaCodigo}</strong>
+              <span class="badge ${lote.status==='Em Corte'?'badge-corte':lote.status==='Em Pausa / Setup'?'badge-pausa':'badge-pendente'}">${lote.status}</span>
+            </div>
+            <div style="font-size:11px; margin-top:3px;">Remessa: <strong>${lote.remessaNome}</strong></div>
+            <div style="font-size:11px;">Volume do Lote: <strong>${lote.chapasTotais} chapas</strong></div>
+            
+            <div style="display:flex; gap:5px; margin-top:10px;">
+              <button class="btn btn-sm btn-info" style="flex:1;" onclick="alterarEstadoLote('${lote.id}', 'Em Corte')">▶ Iniciar Corte</button>
+              <button class="btn btn-sm btn-warning" style="flex:1;" onclick="alterarEstadoLote('${lote.id}', 'Em Pausa / Setup')">⏸ Pausa</button>
+              <button class="btn btn-sm btn-success" style="flex:1;" onclick="finalizarLoteEProseguir('${lote.id}')">✓ Finalizar Lote</button>
+            </div>
+          </div>
+        `).join('');
+
+        container.innerHTML += `
+          <div class="laser-card">
+            <h4 style="color:var(--primary); margin-bottom:10px; font-size:15px;">${laserNome}</h4>
+            ${lotesPendentes.length === 0 ? '<p style="font-size:11px; color:#666; text-align:center; padding:15px 0;">Nenhum corte pendente nesta máquina.</p>' : htmlLotes}
+          </div>
+        `;
+      });
+    }
+
+    function alterarEstadoLote(id, novoEstado) {
+      const lote = lotesLasers.find(l => l.id === id);
+      if (lote) {
+        lote.status = novoEstado;
+        renderizarPainelLasers();
+        renderizarStatusProgramador();
+      }
+    }
+
+    function finalizarLoteEProseguir(id) {
+      const lote = lotesLasers.find(l => l.id === id);
+      if (lote) {
+        lote.chapasConcluidas = lote.chapasTotais;
+        lote.status = 'Concluído';
+        renderizarPainelLasers();
+        renderizarStatusProgramador();
+      }
+    }
+
+    function renderizarHistorico() {
+      const tb = document.getElementById('tb-historico-remessas');
+      const remessasArquivadas = remessasGerais.filter(r => r.statusCiclo === 'Arquivada');
+
+      if (remessasArquivadas.length === 0) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhuma remessa arquivada no histórico.</td></tr>';
+        return;
+      }
+
+      tb.innerHTML = remessasArquivadas.map(r => `
+        <tr>
+          <td>${r.data}</td>
+          <td><strong>${r.nome}</strong></td>
+          <td>${r.itens.reduce((acc, curr) => acc + curr.qtd, 0)} peças solicitadas</td>
+          <td><span class="badge badge-archived">ARQUIVADA</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="desarquivarRemessa('${r.id}')">Reativar</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function desarquivarRemessa(id) {
+      const rem = remessasGerais.find(r => r.id === id);
+      if (rem) {
+        rem.statusCiclo = 'Ativa';
+        programarEDistribuirRemessas();
+        renderizarHistorico();
+      }
+    }
+
+    addComposicaoItem('300mm', 38);
+    addComposicaoItem('200mm', 6);
+    init();
+  </script>
+</body>
+</html>
